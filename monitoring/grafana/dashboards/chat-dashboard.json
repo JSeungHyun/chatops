@@ -1,0 +1,10 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "ChatOps Dashboard",
+    "tags": ["chatops"],
+    "timezone": "browser",
+    "panels": [],
+    "version": 0
+  }
+}

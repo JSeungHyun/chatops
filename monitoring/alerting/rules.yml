@@ -1,0 +1,3 @@
+groups:
+  - name: chatops-alerts
+    rules: []

@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  nickname  String
+  avatar    String?
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages     Message[]
+  chatRooms    ChatRoomMember[]
+  readReceipts ReadReceipt[]
+}
+
+model ChatRoom {
+  id        String   @id @default(uuid())
+  name      String?
+  type      RoomType @default(DIRECT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  ChatRoomMember[]
+  messages Message[]
+}
+
+model ChatRoomMember {
+  id       String   @id @default(uuid())
+  userId   String
+  roomId   String
+  joinedAt DateTime @default(now())
+
+  user User     @relation(fields: [userId], references: [id])
+  room ChatRoom @relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId])
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  content   String
+  type      MessageType @default(TEXT)
+  fileUrl   String?
+  userId    String
+  roomId    String
+  createdAt DateTime    @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  room         ChatRoom      @relation(fields: [roomId], references: [id])
+  readReceipts ReadReceipt[]
+
+  @@index([roomId, createdAt])
+}
+
+model ReadReceipt {
+  id        String   @id @default(uuid())
+  userId    String
+  messageId String
+  readAt    DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  message Message @relation(fields: [messageId], references: [id])
+
+  @@unique([userId, messageId])
+  @@index([messageId])
+}
+
+enum RoomType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
