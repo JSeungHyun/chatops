@@ -41,3 +41,5 @@ coverage/
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+CLAUDE.md
