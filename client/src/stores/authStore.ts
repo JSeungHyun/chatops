@@ -1,21 +1,51 @@
 import { create } from 'zustand';
 
-interface User {
+interface AuthUser {
   id: string;
   email: string;
   nickname: string;
 }
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
-  setAuth: (user: User, token: string) => void;
+  isAuthenticated: boolean;
+  setAuth: (user: AuthUser, token: string) => void;
   logout: () => void;
 }
 
+function loadToken(): string | null {
+  try {
+    return localStorage.getItem('chatops_token');
+  } catch {
+    return null;
+  }
+}
+
+function loadUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem('chatops_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+const initialToken = loadToken();
+const initialUser = loadUser();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  setAuth: (user, token) => set({ user, token }),
-  logout: () => set({ user: null, token: null }),
+  user: initialUser,
+  token: initialToken,
+  isAuthenticated: !!initialToken && !!initialUser,
+  setAuth: (user, token) => {
+    localStorage.setItem('chatops_token', token);
+    localStorage.setItem('chatops_user', JSON.stringify(user));
+    set({ user, token, isAuthenticated: true });
+  },
+  logout: () => {
+    localStorage.removeItem('chatops_token');
+    localStorage.removeItem('chatops_user');
+    set({ user: null, token: null, isAuthenticated: false });
+  },
 }));
