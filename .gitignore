@@ -7,6 +7,10 @@ dist/
 build/
 *.tsbuildinfo
 
+# Gradle
+.gradle/
+!gradle/wrapper/
+
 # Environment files
 .env
 .env.local
@@ -37,9 +41,5 @@ logs/
 
 # Coverage
 coverage/
-
-# Prisma
-prisma/*.db
-prisma/*.db-journal
 
 CLAUDE.md

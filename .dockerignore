@@ -1,8 +1,5 @@
 node_modules
 .git
-.env
-.env.local
-.env.*.local
 .omc
 .claude
 dist
@@ -16,3 +13,5 @@ logs
 *.swo
 .DS_Store
 Thumbs.db
+.gradle
+.pnpm-store

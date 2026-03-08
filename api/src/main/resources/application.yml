@@ -1,0 +1,50 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/chatops
+    username: chatops
+    password: chatops
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+  data:
+    redis:
+      host: redis
+      port: 6379
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+server:
+  port: 3000
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:your-secret-key}
+    expiration: 604800000
+  minio:
+    endpoint: minio
+    port: 9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: chatops-files
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: always

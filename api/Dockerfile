@@ -1,27 +1,15 @@
-# Stage 1: Install dependencies
-FROM node:24-slim AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Stage 1: Build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
-COPY .npmrc ./
-RUN pnpm install --frozen-lockfile || pnpm install
+COPY gradle/ gradle/
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
+COPY src/ src/
+RUN ./gradlew bootJar --no-daemon
 
-# Stage 2: Build
-FROM node:24-slim AS build
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Stage 2: Production
+FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npx prisma generate
-RUN rm -f tsconfig.tsbuildinfo && pnpm run build
-
-# Stage 3: Production
-FROM node:24-slim AS production
-RUN corepack enable && corepack prepare pnpm@latest --activate
-WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./
-COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/build/libs/*.jar app.jar
 EXPOSE 3000
-CMD ["node", "dist/main"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

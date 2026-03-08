@@ -20,8 +20,12 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-    env_file:
-      - .env
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/actuator/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   client:
     build: ./client
@@ -60,32 +64,6 @@ services:
       timeout: 5s
       retries: 5
 
-  worker-notification:
-    build: ./workers/notification
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - .env
-
-  worker-read-receipt:
-    build: ./workers/read-receipt
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - .env
-
-  worker-file-process:
-    build: ./workers/file-process
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      minio:
-        condition: service_started
-    env_file:
-      - .env
-
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -106,7 +84,7 @@ services:
   grafana:
     image: grafana/grafana
     ports:
-      - '3000:3000'
+      - '3001:3000'
 
 volumes:
   pg_data:
