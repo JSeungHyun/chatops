@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -50,7 +50,7 @@ export class ChatService {
     });
   }
 
-  async getRoomById(id: string) {
+  async getRoomById(id: string, userId: string) {
     const room = await this.prisma.chatRoom.findUnique({
       where: { id },
       include: {
@@ -62,6 +62,10 @@ export class ChatService {
 
     if (!room) {
       throw new NotFoundException('Chat room not found');
+    }
+
+    if (!room.members.some((m) => m.userId === userId)) {
+      throw new ForbiddenException('You are not a member of this chat room');
     }
 
     return room;
@@ -97,9 +101,22 @@ export class ChatService {
     return message;
   }
 
-  async getMessages(roomId: string, pagination: PaginationDto) {
+  async getMessages(roomId: string, userId: string, pagination: PaginationDto) {
     const { page = 1, limit = 20 } = pagination;
     const skip = (page - 1) * limit;
+
+    const room = await this.prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: { members: true },
+    });
+
+    if (!room) {
+      throw new NotFoundException('Chat room not found');
+    }
+
+    if (!room.members.some((m) => m.userId === userId)) {
+      throw new ForbiddenException('You are not a member of this chat room');
+    }
 
     const [messages, total] = await Promise.all([
       this.prisma.message.findMany({

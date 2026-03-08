@@ -22,8 +22,8 @@ export class ChatController {
   }
 
   @Get(':id')
-  async getRoom(@Param('id') id: string) {
-    return this.chatService.getRoomById(id);
+  async getRoom(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.chatService.getRoomById(id, user.id);
   }
 
   @Post(':id/messages')
@@ -36,7 +36,11 @@ export class ChatController {
   }
 
   @Get(':id/messages')
-  async getMessages(@Param('id') roomId: string, @Query() pagination: PaginationDto) {
-    return this.chatService.getMessages(roomId, pagination);
+  async getMessages(
+    @CurrentUser() user: { id: string },
+    @Param('id') roomId: string,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.chatService.getMessages(roomId, user.id, pagination);
   }
 }

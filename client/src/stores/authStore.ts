@@ -44,8 +44,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, token, isAuthenticated: true });
   },
   logout: () => {
+    const currentUser = useAuthStore.getState().user;
     localStorage.removeItem('chatops_token');
     localStorage.removeItem('chatops_user');
+    if (currentUser) {
+      try {
+        localStorage.removeItem(`chatops_last_room:${currentUser.id}`);
+      } catch {
+        // ignore
+      }
+    }
     set({ user: null, token: null, isAuthenticated: false });
   },
 }));

@@ -1,4 +1,5 @@
-import { useChatStore } from '@/stores/chatStore';
+import { useNavigate } from 'react-router-dom';
+import { useChatStore, saveLastRoomId } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useRooms } from '@/hooks/useRooms';
 import { ChatListItem } from './ChatListItem';
@@ -12,6 +13,7 @@ export function ChatList({ onSelectRoom }: ChatListProps) {
   const { rooms, isLoading } = useRooms();
   const { currentRoom, setCurrentRoom } = useChatStore();
   const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -40,6 +42,8 @@ export function ChatList({ onSelectRoom }: ChatListProps) {
           currentUserId={user?.id ?? ''}
           onClick={() => {
             setCurrentRoom(room);
+            if (user) saveLastRoomId(user.id, room.id);
+            navigate(`/chat/${room.id}`, { replace: true });
             onSelectRoom?.();
           }}
         />

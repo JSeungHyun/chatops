@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import api from '@/api/axios';
-import { useChatStore } from '@/stores/chatStore';
+import { useChatStore, getLastRoomId } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useMessages } from '@/hooks/useMessages';
 import { Header } from '@/components/layout/Header';
@@ -98,7 +98,38 @@ export function ChatRoom() {
     }
   };
 
+  const rooms = useChatStore((s) => s.rooms);
+  const isRestoring = !currentRoom && rooms.length === 0 && user && !!getLastRoomId(user.id);
+
   if (!currentRoom) {
+    if (isRestoring) {
+      return (
+        <div className="flex h-full flex-col">
+          {/* Skeleton header */}
+          <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4">
+            <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
+            <div className="flex flex-col gap-1.5">
+              <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+              <div className="h-3 w-16 animate-pulse rounded bg-slate-200" />
+            </div>
+          </div>
+          {/* Skeleton messages */}
+          <div className="flex flex-1 flex-col gap-3 px-4 py-6">
+            <div className="flex gap-2">
+              <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-10 w-48 animate-pulse rounded-xl bg-slate-200" />
+            </div>
+            <div className="flex justify-end">
+              <div className="h-10 w-36 animate-pulse rounded-xl bg-primary-100" />
+            </div>
+            <div className="flex gap-2">
+              <div className="h-8 w-8 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-10 w-56 animate-pulse rounded-xl bg-slate-200" />
+            </div>
+          </div>
+        </div>
+      );
+    }
     return <EmptyChat />;
   }
 

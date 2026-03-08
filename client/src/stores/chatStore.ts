@@ -1,6 +1,32 @@
 import { create } from 'zustand';
 import type { ChatRoom, Message } from '../types/chat';
 
+const LAST_ROOM_KEY_PREFIX = 'chatops_last_room:';
+
+export function saveLastRoomId(userId: string, roomId: string) {
+  try {
+    localStorage.setItem(`${LAST_ROOM_KEY_PREFIX}${userId}`, roomId);
+  } catch {
+    // localStorage unavailable (e.g. private browsing)
+  }
+}
+
+export function getLastRoomId(userId: string): string | null {
+  try {
+    return localStorage.getItem(`${LAST_ROOM_KEY_PREFIX}${userId}`);
+  } catch {
+    return null;
+  }
+}
+
+export function clearLastRoomId(userId: string) {
+  try {
+    localStorage.removeItem(`${LAST_ROOM_KEY_PREFIX}${userId}`);
+  } catch {
+    // ignore
+  }
+}
+
 interface ChatState {
   rooms: ChatRoom[];
   currentRoom: ChatRoom | null;

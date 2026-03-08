@@ -18,7 +18,7 @@ export function App() {
       <Routes>
         <Route path="/login" element={<LoginRoute />} />
         <Route
-          path="/chat"
+          path="/chat/:roomId?"
           element={
             <AuthGuard>
               <ChatPage />

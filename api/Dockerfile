@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
-RUN pnpm run build
+RUN rm -f tsconfig.tsbuildinfo && pnpm run build
 
 # Stage 3: Production
 FROM node:24-slim AS production

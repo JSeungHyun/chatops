@@ -1,15 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ChatRoom } from '@/components/chat/ChatRoom';
 import { ChatList } from '@/components/chat/ChatList';
 import { NewChatModal } from '@/components/chat/NewChatModal';
-import { useChatStore } from '@/stores/chatStore';
+import { useChatStore, getLastRoomId, clearLastRoomId } from '@/stores/chatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
 
 export function ChatPage() {
   const [showNewChat, setShowNewChat] = useState(false);
+  const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
+  const navigate = useNavigate();
   const currentRoom = useChatStore((s) => s.currentRoom);
+  const rooms = useChatStore((s) => s.rooms);
+  const setCurrentRoom = useChatStore((s) => s.setCurrentRoom);
+  const user = useAuthStore((s) => s.user);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const hasRestoredRef = useRef(false);
+
+  // Restore last room after rooms are loaded
+  useEffect(() => {
+    if (hasRestoredRef.current || rooms.length === 0 || currentRoom || !user) return;
+    hasRestoredRef.current = true;
+
+    const targetRoomId = urlRoomId || getLastRoomId(user.id);
+    if (!targetRoomId) return;
+
+    const room = rooms.find((r) => r.id === targetRoomId);
+    if (room) {
+      setCurrentRoom(room);
+      if (!urlRoomId) {
+        navigate(`/chat/${room.id}`, { replace: true });
+      }
+    } else {
+      // Room not found (deleted/kicked) — clean up silently
+      clearLastRoomId(user.id);
+      if (urlRoomId) {
+        navigate('/chat', { replace: true });
+      }
+    }
+  }, [rooms, currentRoom, user, urlRoomId, navigate, setCurrentRoom]);
 
   const handleSelectRoom = () => {
     // On mobile, close sidebar when a room is selected
