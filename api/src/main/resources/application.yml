@@ -40,6 +40,12 @@ app:
     secret-key: minioadmin
     bucket: chatops-files
 
+logging:
+  level:
+    org.springframework.web.socket: DEBUG
+    org.springframework.messaging: DEBUG
+    com.chatops.global.config.WebSocketAuthInterceptor: DEBUG
+
 management:
   endpoints:
     web:

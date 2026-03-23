@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatController {
     private final ChatService chatService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping
     public ChatRoomResponse createRoom(
@@ -46,7 +48,9 @@ public class ChatController {
             @AuthenticationPrincipal User user,
             @PathVariable String id,
             @Valid @RequestBody SendMessageRequest request) {
-        return chatService.sendMessage(user.getId(), id, request);
+        MessageResponse response = chatService.sendMessage(user.getId(), id, request);
+        messagingTemplate.convertAndSend("/topic/room/" + id, response);
+        return response;
     }
 
     @GetMapping("/{id}/messages")

@@ -22,3 +22,10 @@ export interface ChatRoomMember {
 }
 
 export type { Message } from './message';
+
+export interface TypingEvent {
+  userId: string;
+  nickname: string;
+  roomId: string;
+  isTyping: boolean;
+}

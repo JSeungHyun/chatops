@@ -16,6 +16,7 @@ import com.chatops.domain.chat.entity.ChatRoomMember;
 import com.chatops.domain.chat.repository.ChatRoomRepository;
 import com.chatops.domain.chat.repository.ChatRoomMemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -24,10 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
@@ -52,8 +56,13 @@ public class ChatService {
             .build();
         chatRoomMemberRepository.save(creatorMember);
 
-        // Add other members
-        List<ChatRoomMember> otherMembers = request.getMemberIds().stream()
+        // Deduplicate memberIds and exclude creator
+        Set<String> uniqueMemberIds = new HashSet<>(request.getMemberIds());
+        if (uniqueMemberIds.remove(userId)) {
+            log.warn("Creator userId {} was included in memberIds, deduplicated", userId);
+        }
+
+        List<ChatRoomMember> otherMembers = uniqueMemberIds.stream()
             .map(memberId -> ChatRoomMember.builder()
                 .userId(memberId)
                 .roomId(savedRoom.getId())

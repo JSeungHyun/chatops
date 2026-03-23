@@ -89,6 +89,23 @@ export function LoginPage() {
     setFieldErrors({});
   }
 
+  async function quickLogin(email: string) {
+    setApiError('');
+    setLoading(true);
+    try {
+      const res = await api.post<{ accessToken: string; user: { id: string; email: string; nickname: string } }>(
+        '/auth/login',
+        { email, password: 'test1234' },
+      );
+      setAuth(res.data.user, res.data.accessToken);
+      navigate('/chat', { replace: true });
+    } catch {
+      setApiError('Quick login failed. Make sure the account exists with password test1234.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setApiError('');
@@ -223,6 +240,36 @@ export function LoginPage() {
               <Button type="submit" size="lg" loading={loading} className="mt-2 w-full">
                 Sign in
               </Button>
+
+              <div className="mt-4 border-t border-slate-200 pt-4">
+                <p className="mb-2 text-center text-xs text-slate-400">Quick Login</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('admin@admin.com')}
+                    className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Admin
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('test@test.com')}
+                    className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Test
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => quickLogin('otheruser@test.com')}
+                    className="flex-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Other
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 

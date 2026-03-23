@@ -35,6 +35,7 @@ interface ChatState {
   totalPages: number;
   hasMore: boolean;
   isLoadingMessages: boolean;
+  typingUsers: Record<string, string>; // userId -> nickname
   setRooms: (rooms: ChatRoom[]) => void;
   setCurrentRoom: (room: ChatRoom | null) => void;
   setMessages: (messages: Message[]) => void;
@@ -45,6 +46,8 @@ interface ChatState {
   setTotalPages: (total: number) => void;
   setHasMore: (hasMore: boolean) => void;
   setIsLoadingMessages: (loading: boolean) => void;
+  setTypingUser: (userId: string, nickname: string, isTyping: boolean) => void;
+  clearTypingUsers: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -55,6 +58,7 @@ export const useChatStore = create<ChatState>((set) => ({
   totalPages: 0,
   hasMore: false,
   isLoadingMessages: false,
+  typingUsers: {},
   setRooms: (rooms) => set({ rooms }),
   setCurrentRoom: (room) => set({ currentRoom: room }),
   setMessages: (messages) => set({ messages }),
@@ -67,4 +71,15 @@ export const useChatStore = create<ChatState>((set) => ({
   setTotalPages: (totalPages) => set({ totalPages }),
   setHasMore: (hasMore) => set({ hasMore }),
   setIsLoadingMessages: (isLoadingMessages) => set({ isLoadingMessages }),
+  setTypingUser: (userId, nickname, isTyping) =>
+    set((state) => {
+      const next = { ...state.typingUsers };
+      if (isTyping) {
+        next[userId] = nickname;
+      } else {
+        delete next[userId];
+      }
+      return { typingUsers: next };
+    }),
+  clearTypingUsers: () => set({ typingUsers: {} }),
 }));

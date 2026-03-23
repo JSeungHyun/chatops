@@ -12,7 +12,9 @@ services:
   api:
     build: ./api
     deploy:
-      replicas: 2
+      # Week 2: SimpleBroker는 인스턴스별 인메모리 브로커이므로 replicas:1 설정
+      # Week 3에서 Redis StompBrokerRelay 도입 후 replicas:2로 복원
+      replicas: 1
     depends_on:
       postgres:
         condition: service_healthy

@@ -3,6 +3,7 @@ import api from '@/api/axios';
 import { useChatStore, getLastRoomId } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useMessages } from '@/hooks/useMessages';
+import { useSocket } from '@/hooks/useSocket';
 import { Header } from '@/components/layout/Header';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
@@ -11,6 +12,7 @@ import { DateSeparator } from './DateSeparator';
 import { EmptyChat } from './EmptyChat';
 import { Spinner } from '@/components/common/Spinner';
 import type { Message } from '@/types/message';
+import type { TypingEvent } from '@/types/chat';
 
 function isSameDay(a: string, b: string): boolean {
   const da = new Date(a);
@@ -25,11 +27,49 @@ function isSameDay(a: string, b: string): boolean {
 export function ChatRoom() {
   const currentRoom = useChatStore((s) => s.currentRoom);
   const addMessage = useChatStore((s) => s.addMessage);
+  const typingUsers = useChatStore((s) => s.typingUsers);
+  const setTypingUser = useChatStore((s) => s.setTypingUser);
+  const clearTypingUsers = useChatStore((s) => s.clearTypingUsers);
   const user = useAuthStore((s) => s.user);
 
   const { messages, isLoading, hasMore, loadMore } = useMessages(
     currentRoom?.id ?? null,
   );
+
+  const handleWsMessage = useCallback(
+    (data: unknown) => {
+      const msg = data as Message;
+      // Skip messages sent by the current user (already added via REST response)
+      if (msg.userId === user?.id) return;
+      addMessage(msg);
+      // Auto-scroll to bottom when receiving new message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+    },
+    [user?.id, addMessage],
+  );
+
+  const handleTyping = useCallback(
+    (data: unknown) => {
+      const evt = data as TypingEvent;
+      if (evt.userId !== user?.id) {
+        setTypingUser(evt.userId, evt.nickname, evt.isTyping);
+      }
+    },
+    [user?.id, setTypingUser],
+  );
+
+  useSocket({
+    roomId: currentRoom?.id,
+    onMessage: handleWsMessage,
+    onTyping: handleTyping,
+  });
+
+  // Clear typing users when changing rooms
+  useEffect(() => {
+    clearTypingUsers();
+  }, [currentRoom?.id, clearTypingUsers]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -201,13 +241,12 @@ export function ChatRoom() {
           );
         })}
 
-        {/* Typing indicator (stub — data from WebSocket in Stage 2) */}
-        <TypingIndicator users={[]} />
+        <TypingIndicator users={Object.values(typingUsers)} />
 
         <div ref={messagesEndRef} />
       </div>
 
-      <MessageInput onSend={handleSend} />
+      <MessageInput onSend={handleSend} roomId={currentRoom?.id} />
     </div>
   );
 }

@@ -1,18 +1,43 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import { FileUpload } from './FileUpload';
 import clsx from 'clsx';
+import { sendStompMessage } from '@/socket/socket';
 
 interface MessageInputProps {
   onSend: (content: string) => void;
   disabled?: boolean;
+  roomId?: string;
 }
 
 const MAX_LENGTH = 5000;
+const TYPING_DEBOUNCE_MS = 1500;
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, disabled, roomId }: MessageInputProps) {
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
+
+  const sendTyping = useCallback((isTyping: boolean) => {
+    if (!roomId) return;
+    sendStompMessage(`/app/chat/${roomId}/typing`, { typing: isTyping });
+  }, [roomId]);
+
+  const stopTyping = useCallback(() => {
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      sendTyping(false);
+    }
+  }, [sendTyping]);
+
+  // Clear typing timer on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      stopTyping();
+    };
+  }, [stopTyping]);
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current;
@@ -25,12 +50,24 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
     if (e.target.value.length <= MAX_LENGTH) {
       setContent(e.target.value);
       adjustHeight();
+
+      // Typing indicator
+      if (!isTypingRef.current) {
+        isTypingRef.current = true;
+        sendTyping(true);
+      }
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => {
+        stopTyping();
+      }, TYPING_DEBOUNCE_MS);
     }
   };
 
   const handleSend = () => {
     const trimmed = content.trim();
     if (!trimmed || disabled) return;
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    stopTyping();
     onSend(trimmed);
     setContent('');
     if (textareaRef.current) {
