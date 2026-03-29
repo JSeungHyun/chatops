@@ -12,14 +12,13 @@ services:
   api:
     build: ./api
     deploy:
-      # Week 2: SimpleBroker는 인스턴스별 인메모리 브로커이므로 replicas:1 설정
-      # Week 3에서 Redis StompBrokerRelay 도입 후 replicas:2로 복원
-      replicas: 1
+      # Week 3: Redis Pub/Sub 릴레이로 서버 간 메시지 동기화 완료
+      replicas: 2
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     healthcheck:
@@ -52,8 +51,14 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-chatops-redis}
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-chatops-redis}', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management

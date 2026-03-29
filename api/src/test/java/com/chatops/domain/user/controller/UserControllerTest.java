@@ -5,6 +5,7 @@ import com.chatops.domain.user.entity.User;
 import com.chatops.domain.user.repository.UserRepository;
 import com.chatops.domain.user.service.UserService;
 import com.chatops.global.config.CustomAuthenticationEntryPoint;
+import com.chatops.global.redis.RedisService;
 import com.chatops.global.config.JwtAuthenticationFilter;
 import com.chatops.global.config.JwtTokenProvider;
 import com.chatops.global.config.SecurityConfig;
@@ -49,6 +50,9 @@ class UserControllerTest {
 
     @MockBean
     private UserRepository userRepository;
+
+    @MockBean
+    private RedisService redisService;
 
     private String setupAuth() {
         String token = "test-jwt-token";

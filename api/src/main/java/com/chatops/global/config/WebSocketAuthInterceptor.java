@@ -27,6 +27,9 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
     private static final Pattern ROOM_TOPIC_PATTERN =
         Pattern.compile("^/topic/room/([^/]+)(/typing)?$");
 
+    private static final Pattern ROOM_SEND_PATTERN =
+        Pattern.compile("^/app/chat/([^/]+)/(send|typing|leave)$");
+
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor =
@@ -83,6 +86,28 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                     throw new MessageDeliveryException("Not a member of this room");
                 }
                 log.debug("SUBSCRIBE allowed: userId={} -> {}", userId, destination);
+            }
+        }
+
+        if (StompCommand.SEND.equals(command)) {
+            String destination = accessor.getDestination();
+            if (destination != null) {
+                Matcher sendMatcher = ROOM_SEND_PATTERN.matcher(destination);
+                if (sendMatcher.matches()) {
+                    String roomId = sendMatcher.group(1);
+                    Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
+                    String userId = sessionAttributes != null
+                        ? (String) sessionAttributes.get("userId")
+                        : null;
+                    if (userId == null) {
+                        throw new MessageDeliveryException("Not authenticated");
+                    }
+                    boolean isMember = chatRoomMemberRepository.existsByUserIdAndRoomId(userId, roomId);
+                    if (!isMember) {
+                        log.warn("SEND denied: userId={} is not a member of roomId={}", userId, roomId);
+                        throw new MessageDeliveryException("Not a member of this room");
+                    }
+                }
             }
         }
 

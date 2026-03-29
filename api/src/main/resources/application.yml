@@ -1,9 +1,16 @@
 spring:
   datasource:
     url: jdbc:postgresql://postgres:5432/chatops
-    username: chatops
-    password: chatops
+    username: ${DB_USERNAME:chatops}
+    password: ${DB_PASSWORD:chatops}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,11 +27,17 @@ spring:
     redis:
       host: redis
       port: 6379
+      password: ${REDIS_PASSWORD:}
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 4
   rabbitmq:
     host: rabbitmq
     port: 5672
-    username: guest
-    password: guest
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
 
 server:
   port: 3000
@@ -36,15 +49,13 @@ app:
   minio:
     endpoint: minio
     port: 9000
-    access-key: minioadmin
-    secret-key: minioadmin
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: chatops-files
 
 logging:
   level:
-    org.springframework.web.socket: DEBUG
-    org.springframework.messaging: DEBUG
-    com.chatops.global.config.WebSocketAuthInterceptor: DEBUG
+    com.chatops: INFO
 
 management:
   endpoints:
@@ -53,4 +64,4 @@ management:
         include: health,prometheus
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized

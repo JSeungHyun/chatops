@@ -15,7 +15,9 @@ import com.chatops.domain.message.repository.MessageRepository;
 import com.chatops.domain.user.entity.User;
 import com.chatops.domain.user.repository.UserRepository;
 import com.chatops.global.common.dto.PageResponse;
+import com.chatops.global.redis.RedisService;
 import com.chatops.support.TestFixture;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -54,6 +57,12 @@ class ChatServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private RedisService redisService;
+
+    @Mock
+    private ObjectMapper objectMapper;
+
     @Test
     @DisplayName("createRoom - 1대1 성공")
     void createRoom_1대1_성공() {
@@ -69,8 +78,8 @@ class ChatServiceTest {
             TestFixture.createChatRoomMember("m-1", "user-1", "room-1"),
             TestFixture.createChatRoomMember("m-2", "user-2", "room-1")
         ));
-        given(userRepository.findById("user-1")).willReturn(Optional.of(TestFixture.createUser()));
-        given(userRepository.findById("user-2")).willReturn(Optional.of(
+        given(userRepository.findAllById(anyCollection())).willReturn(List.of(
+            TestFixture.createUser(),
             TestFixture.createUser("user-2", "user2@example.com", "user2")));
 
         ChatRoomResponse result = chatService.createRoom("user-1", request);
@@ -97,10 +106,9 @@ class ChatServiceTest {
             TestFixture.createChatRoomMember("m-2", "user-2", "room-1"),
             TestFixture.createChatRoomMember("m-3", "user-3", "room-1")
         ));
-        given(userRepository.findById("user-1")).willReturn(Optional.of(TestFixture.createUser()));
-        given(userRepository.findById("user-2")).willReturn(Optional.of(
-            TestFixture.createUser("user-2", "user2@example.com", "user2")));
-        given(userRepository.findById("user-3")).willReturn(Optional.of(
+        given(userRepository.findAllById(anyCollection())).willReturn(List.of(
+            TestFixture.createUser(),
+            TestFixture.createUser("user-2", "user2@example.com", "user2"),
             TestFixture.createUser("user-3", "user3@example.com", "user3")));
 
         ChatRoomResponse result = chatService.createRoom("user-1", request);
@@ -137,7 +145,7 @@ class ChatServiceTest {
         given(chatRoomMemberRepository.findByRoomId("room-1")).willReturn(List.of(
             TestFixture.createChatRoomMember("m-1", "user-1", "room-1")
         ));
-        given(userRepository.findById("user-1")).willReturn(Optional.of(TestFixture.createUser()));
+        given(userRepository.findAllById(anyCollection())).willReturn(List.of(TestFixture.createUser()));
 
         ChatRoomResponse result = chatService.getRoomById("room-1", "user-1");
 
@@ -192,7 +200,7 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("getMessages - 페이지네이션")
+    @DisplayName("getMessages - 페이지네이션 (캐시 미스, DB fallback)")
     void getMessages_페이지네이션() {
         ChatRoom room = TestFixture.createChatRoom("room-1", "Room", RoomType.DIRECT);
         Message msg = TestFixture.createMessage("msg-1", "Hello", "user-1", "room-1");
@@ -200,15 +208,39 @@ class ChatServiceTest {
 
         given(chatRoomRepository.findById("room-1")).willReturn(Optional.of(room));
         given(chatRoomMemberRepository.existsByUserIdAndRoomId("user-1", "room-1")).willReturn(true);
+        given(redisService.getCachedMessages("room-1")).willReturn(List.of());
         given(messageRepository.findByRoomIdOrderByCreatedAtDesc(eq("room-1"), any(PageRequest.class)))
             .willReturn(new PageImpl<>(List.of(msg), PageRequest.of(0, 20), 1));
-        given(userRepository.findById("user-1")).willReturn(Optional.of(sender));
+        given(userRepository.findAllById(anyCollection())).willReturn(List.of(sender));
 
         PageResponse<MessageResponse> result = chatService.getMessages("room-1", "user-1", 1, 20);
 
         assertThat(result.getData()).hasSize(1);
         assertThat(result.getMeta().getTotal()).isEqualTo(1);
         assertThat(result.getMeta().getPage()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("getMessages - 캐시 히트 시 DB 조회 스킵")
+    void getMessages_캐시히트() throws Exception {
+        ChatRoom room = TestFixture.createChatRoom("room-1", "Room", RoomType.DIRECT);
+
+        given(chatRoomRepository.findById("room-1")).willReturn(Optional.of(room));
+        given(chatRoomMemberRepository.existsByUserIdAndRoomId("user-1", "room-1")).willReturn(true);
+
+        String cachedJson = "{\"id\":\"msg-1\",\"content\":\"Cached\",\"type\":\"TEXT\",\"userId\":\"user-1\",\"roomId\":\"room-1\"}";
+        given(redisService.getCachedMessages("room-1")).willReturn(List.of(cachedJson));
+        given(objectMapper.readValue(eq(cachedJson), eq(MessageResponse.class)))
+            .willReturn(MessageResponse.builder()
+                .id("msg-1").content("Cached").type(MessageType.TEXT)
+                .userId("user-1").roomId("room-1").build());
+        given(messageRepository.countByRoomId("room-1")).willReturn(1L);
+
+        PageResponse<MessageResponse> result = chatService.getMessages("room-1", "user-1", 1, 20);
+
+        assertThat(result.getData()).hasSize(1);
+        assertThat(result.getData().get(0).getContent()).isEqualTo("Cached");
+        assertThat(result.getMeta().getTotal()).isEqualTo(1);
     }
 
     @Test

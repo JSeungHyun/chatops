@@ -17,4 +17,5 @@ public class ChatRoomResponse {
     private LocalDateTime updatedAt;
     private List<MemberResponse> members;
     private List<MessageResponse> messages;
+    private Integer unreadCount;
 }

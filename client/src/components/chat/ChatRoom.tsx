@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import api from '@/api/axios';
+import { getStompClient } from '@/socket/socket';
 import { useChatStore, getLastRoomId } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useMessages } from '@/hooks/useMessages';
@@ -70,6 +71,20 @@ export function ChatRoom() {
   useEffect(() => {
     clearTypingUsers();
   }, [currentRoom?.id, clearTypingUsers]);
+
+  // Notify server when leaving a room (unmount or room change)
+  useEffect(() => {
+    if (!currentRoom?.id) return;
+    return () => {
+      const client = getStompClient();
+      if (client.connected) {
+        client.publish({
+          destination: `/app/chat/${currentRoom.id}/leave`,
+          body: '{}',
+        });
+      }
+    };
+  }, [currentRoom?.id]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);

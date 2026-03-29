@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { Users } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
 import { formatRelativeTime } from '@/utils/format';
+import { useChatStore } from '@/stores/chatStore';
 import type { ChatRoom } from '@/types/chat';
 
 interface ChatListItemProps {
@@ -16,6 +17,10 @@ export function ChatListItem({ room, isActive, currentUserId, onClick }: ChatLis
     room.type === 'DIRECT'
       ? room.members.find((m) => m.userId !== currentUserId)
       : null;
+
+  const isOtherOnline = useChatStore((s) =>
+    otherMember ? (s.onlineUsers[otherMember.userId] ?? false) : false
+  );
 
   const displayName =
     room.type === 'DIRECT'
@@ -47,7 +52,15 @@ export function ChatListItem({ room, isActive, currentUserId, onClick }: ChatLis
       )}
     >
       {room.type === 'DIRECT' ? (
-        <Avatar src={avatarSrc} name={displayName} size="md" />
+        <div className="relative shrink-0">
+          <Avatar src={avatarSrc} name={displayName} size="md" />
+          <span
+            className={clsx(
+              'absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white',
+              isOtherOnline ? 'bg-green-500' : 'bg-slate-300',
+            )}
+          />
+        </div>
       ) : (
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500">
           <Users size={18} />
@@ -64,9 +77,16 @@ export function ChatListItem({ room, isActive, currentUserId, onClick }: ChatLis
           >
             {displayName}
           </span>
-          <span className="shrink-0 text-xs text-slate-400">
-            {formatRelativeTime(timestamp)}
-          </span>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {(room.unreadCount ?? 0) > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
+                {(room.unreadCount ?? 0) > 99 ? '99+' : room.unreadCount}
+              </span>
+            )}
+            <span className="text-xs text-slate-400">
+              {formatRelativeTime(timestamp)}
+            </span>
+          </div>
         </div>
         {lastMessageText !== null && (
           <p className="mt-0.5 truncate text-xs text-slate-500">{lastMessageText}</p>

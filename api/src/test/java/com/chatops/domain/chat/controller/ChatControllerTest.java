@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import com.chatops.global.redis.RedisMessageRelay;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -52,6 +53,9 @@ class ChatControllerTest {
 
     @MockBean
     private SimpMessagingTemplate messagingTemplate;
+
+    @MockBean
+    private RedisMessageRelay redisMessageRelay;
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;

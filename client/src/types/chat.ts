@@ -11,6 +11,7 @@ export interface ChatRoom {
   updatedAt: string;
   members: ChatRoomMember[];
   messages?: Message[];
+  unreadCount?: number;
 }
 
 export interface ChatRoomMember {

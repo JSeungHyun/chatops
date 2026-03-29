@@ -6,6 +6,7 @@ import com.chatops.domain.chat.dto.CreateRoomRequest;
 import com.chatops.domain.chat.dto.SendMessageRequest;
 import com.chatops.domain.chat.service.ChatService;
 import com.chatops.global.common.dto.PageResponse;
+import com.chatops.global.redis.RedisMessageRelay;
 import com.chatops.domain.user.entity.User;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -17,18 +18,26 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST API for chat room operations.
+ * Message sending via REST also broadcasts to STOMP subscribers
+ * so that other connected clients receive the message in real-time.
+ */
 @RestController
 @RequestMapping("/chats")
 @RequiredArgsConstructor
 public class ChatController {
     private final ChatService chatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final RedisMessageRelay redisMessageRelay;
 
     @PostMapping
     public ChatRoomResponse createRoom(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody CreateRoomRequest request) {
-        return chatService.createRoom(user.getId(), request);
+        ChatRoomResponse room = chatService.createRoom(user.getId(), request);
+        redisMessageRelay.subscribeToRoom(room.getId());
+        return room;
     }
 
     @GetMapping
@@ -50,6 +59,7 @@ public class ChatController {
             @Valid @RequestBody SendMessageRequest request) {
         MessageResponse response = chatService.sendMessage(user.getId(), id, request);
         messagingTemplate.convertAndSend("/topic/room/" + id, response);
+        redisMessageRelay.publishToChannel("/topic/room/" + id, response);
         return response;
     }
 

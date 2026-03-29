@@ -4,20 +4,27 @@ import com.chatops.domain.auth.dto.UserResponse;
 import com.chatops.domain.user.dto.UpdateUserRequest;
 import com.chatops.domain.user.entity.User;
 import com.chatops.domain.user.service.UserService;
+import com.chatops.global.redis.RedisService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
+@Validated
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
+    private final RedisService redisService;
 
     @GetMapping("/me")
     public UserResponse getMe(@AuthenticationPrincipal User user) {
@@ -35,8 +42,17 @@ public class UserController {
     }
 
     @PatchMapping("/{id}")
-    public UserResponse updateUser(@PathVariable String id,
+    public UserResponse updateUser(@AuthenticationPrincipal User user,
+                                   @PathVariable String id,
                                    @Valid @RequestBody UpdateUserRequest request) {
+        if (!user.getId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot update another user's profile");
+        }
         return userService.update(id, request);
+    }
+
+    @GetMapping("/online-status")
+    public Map<String, Boolean> getOnlineStatus(@RequestParam @Size(max = 100) List<String> userIds) {
+        return redisService.getOnlineStatuses(userIds);
     }
 }

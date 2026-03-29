@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, String> {
     Page<Message> findByRoomIdOrderByCreatedAtDesc(String roomId, Pageable pageable);
+    long countByRoomId(String roomId);
     Optional<Message> findFirstByRoomIdOrderByCreatedAtDesc(String roomId);
 
     @Query("SELECT m FROM Message m JOIN FETCH m.user WHERE m.id IN " +

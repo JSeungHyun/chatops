@@ -36,6 +36,7 @@ interface ChatState {
   hasMore: boolean;
   isLoadingMessages: boolean;
   typingUsers: Record<string, string>; // userId -> nickname
+  onlineUsers: Record<string, boolean>; // userId -> online
   setRooms: (rooms: ChatRoom[]) => void;
   setCurrentRoom: (room: ChatRoom | null) => void;
   setMessages: (messages: Message[]) => void;
@@ -48,6 +49,8 @@ interface ChatState {
   setIsLoadingMessages: (loading: boolean) => void;
   setTypingUser: (userId: string, nickname: string, isTyping: boolean) => void;
   clearTypingUsers: () => void;
+  setOnlineUser: (userId: string, online: boolean) => void;
+  setOnlineUsers: (statuses: Record<string, boolean>) => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -59,8 +62,17 @@ export const useChatStore = create<ChatState>((set) => ({
   hasMore: false,
   isLoadingMessages: false,
   typingUsers: {},
+  onlineUsers: {},
   setRooms: (rooms) => set({ rooms }),
-  setCurrentRoom: (room) => set({ currentRoom: room }),
+  setCurrentRoom: (room) =>
+    set((state) => ({
+      currentRoom: room,
+      rooms: room
+        ? state.rooms.map((r) =>
+            r.id === room.id ? { ...r, unreadCount: 0 } : r
+          )
+        : state.rooms,
+    })),
   setMessages: (messages) => set({ messages }),
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   prependMessages: (messages) =>
@@ -82,4 +94,12 @@ export const useChatStore = create<ChatState>((set) => ({
       return { typingUsers: next };
     }),
   clearTypingUsers: () => set({ typingUsers: {} }),
+  setOnlineUser: (userId, online) =>
+    set((state) => ({
+      onlineUsers: { ...state.onlineUsers, [userId]: online },
+    })),
+  setOnlineUsers: (statuses) =>
+    set((state) => ({
+      onlineUsers: { ...state.onlineUsers, ...statuses },
+    })),
 }));

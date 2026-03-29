@@ -4,6 +4,7 @@ spring:
   data:
     redis:
       host: localhost
+      password:
   rabbitmq:
     host: localhost
   jpa:
@@ -20,3 +21,8 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.web.socket: DEBUG
+    org.springframework.messaging: DEBUG
+    com.chatops.global.config.WebSocketAuthInterceptor: DEBUG
+    com.chatops.global.redis: DEBUG
+    com.chatops: DEBUG

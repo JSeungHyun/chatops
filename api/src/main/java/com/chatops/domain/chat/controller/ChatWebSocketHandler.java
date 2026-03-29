@@ -6,6 +6,8 @@ import com.chatops.domain.chat.dto.TypingEvent;
 import com.chatops.domain.chat.dto.WebSocketErrorResponse;
 import com.chatops.domain.chat.dto.WebSocketMessageRequest;
 import com.chatops.domain.chat.service.ChatService;
+import com.chatops.global.redis.RedisMessageRelay;
+import com.chatops.global.redis.RedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -26,6 +28,8 @@ public class ChatWebSocketHandler {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatService chatService;
+    private final RedisMessageRelay redisMessageRelay;
+    private final RedisService redisService;
 
     @MessageMapping("/chat/{roomId}/send")
     public void handleSendMessage(
@@ -40,6 +44,13 @@ public class ChatWebSocketHandler {
             throw new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "Not authenticated");
         }
 
+        if (request.getContent() == null || request.getContent().isBlank()) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Message content must not be blank");
+        }
+        if (request.getContent().length() > 5000) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "Message content exceeds max length (5000)");
+        }
+
         SendMessageRequest sendRequest = new SendMessageRequest();
         sendRequest.setContent(request.getContent());
         sendRequest.setType(request.getType());
@@ -47,6 +58,7 @@ public class ChatWebSocketHandler {
 
         MessageResponse messageResponse = chatService.sendMessage(userId, roomId, sendRequest);
         messagingTemplate.convertAndSend("/topic/room/" + roomId, messageResponse);
+        redisMessageRelay.publishToChannel("/topic/room/" + roomId, messageResponse);
         log.debug("Message broadcast to /topic/room/{}: userId={}", roomId, userId);
     }
 
@@ -59,13 +71,38 @@ public class ChatWebSocketHandler {
         Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
         String userId = sessionAttributes != null ? (String) sessionAttributes.get("userId") : null;
 
-        typingEvent.setRoomId(roomId);
-        if (userId != null) {
-            typingEvent.setUserId(userId);
+        if (userId == null) {
+            return;
         }
+        typingEvent.setRoomId(roomId);
+        typingEvent.setUserId(userId);
 
         messagingTemplate.convertAndSend("/topic/room/" + roomId + "/typing", typingEvent);
+        redisMessageRelay.publishToChannel("/topic/room/" + roomId + "/typing", typingEvent);
         log.debug("Typing event broadcast to /topic/room/{}/typing: userId={}, isTyping={}", roomId, userId, typingEvent.isTyping());
+    }
+
+    @MessageMapping("/chat/{roomId}/leave")
+    public void handleLeaveRoom(
+        @DestinationVariable String roomId,
+        SimpMessageHeaderAccessor headerAccessor
+    ) {
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
+        String userId = sessionAttributes != null ? (String) sessionAttributes.get("userId") : null;
+        if (userId != null) {
+            redisService.removeViewer(roomId, userId);
+            log.debug("User left room: userId={}, roomId={}", userId, roomId);
+        }
+    }
+
+    @MessageMapping("/heartbeat")
+    public void handleHeartbeat(SimpMessageHeaderAccessor headerAccessor) {
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
+        String userId = sessionAttributes != null ? (String) sessionAttributes.get("userId") : null;
+        if (userId != null) {
+            redisService.refreshHeartbeat(userId);
+            log.trace("Heartbeat received: userId={}", userId);
+        }
     }
 
     @MessageExceptionHandler

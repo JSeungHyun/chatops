@@ -6,6 +6,7 @@ import com.chatops.domain.chat.dto.MessageResponse;
 import com.chatops.domain.chat.dto.CreateRoomRequest;
 import com.chatops.domain.chat.dto.SendMessageRequest;
 import com.chatops.global.common.dto.PageResponse;
+import com.chatops.global.redis.RedisService;
 import com.chatops.domain.message.entity.Message;
 import com.chatops.domain.message.repository.MessageRepository;
 import com.chatops.domain.message.entity.MessageType;
@@ -15,6 +16,8 @@ import com.chatops.domain.chat.entity.ChatRoom;
 import com.chatops.domain.chat.entity.ChatRoomMember;
 import com.chatops.domain.chat.repository.ChatRoomRepository;
 import com.chatops.domain.chat.repository.ChatRoomMemberRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -39,6 +42,8 @@ public class ChatService {
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final RedisService redisService;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public ChatRoomResponse createRoom(String userId, CreateRoomRequest request) {
@@ -93,6 +98,8 @@ public class ChatService {
         Map<String, Message> lastMessageByRoom = lastMessages.stream()
             .collect(Collectors.toMap(Message::getRoomId, m -> m, (a, b) -> a));
 
+        Map<String, Integer> unreadCounts = redisService.getUnreadCounts(userId, roomIds);
+
         return rooms.stream().map(room -> {
             List<MemberResponse> memberResponses = membersByRoom
                 .getOrDefault(room.getId(), List.of()).stream()
@@ -112,6 +119,7 @@ public class ChatService {
                 .updatedAt(room.getUpdatedAt())
                 .members(memberResponses)
                 .messages(messages)
+                .unreadCount(unreadCounts.getOrDefault(room.getId(), 0))
                 .build();
         }).toList();
     }
@@ -148,8 +156,28 @@ public class ChatService {
         room.setUpdatedAt(LocalDateTime.now());
         chatRoomRepository.save(room);
 
-        User sender = userRepository.findById(userId).orElse(null);
-        return MessageResponse.from(saved, sender);
+        User sender = userRepository.findById(userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        MessageResponse response = MessageResponse.from(saved, sender);
+
+        // Increment unread count for members not currently viewing the room
+        Set<String> viewers = redisService.getViewers(roomId);
+        List<ChatRoomMember> members = chatRoomMemberRepository.findByRoomId(roomId);
+        for (ChatRoomMember member : members) {
+            if (!member.getUserId().equals(userId) && !viewers.contains(member.getUserId())) {
+                redisService.incrementUnread(member.getUserId(), roomId);
+            }
+        }
+
+        // Cache the message
+        try {
+            String json = objectMapper.writeValueAsString(response);
+            redisService.cacheMessage(roomId, json);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize message for cache: roomId={}", roomId);
+        }
+
+        return response;
     }
 
     public PageResponse<MessageResponse> getMessages(String roomId, String userId, int page, int limit) {
@@ -160,15 +188,49 @@ public class ChatService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this chat room");
         }
 
+        redisService.addViewer(roomId, userId);
+        redisService.resetUnread(userId, roomId);
+
+        // Try Redis cache for the first page (read-through)
+        if (page == 1) {
+            List<String> cached = redisService.getCachedMessages(roomId);
+            if (!cached.isEmpty()) {
+                List<MessageResponse> cachedResponses = cached.stream()
+                    .map(json -> {
+                        try {
+                            return objectMapper.readValue(json, MessageResponse.class);
+                        } catch (JsonProcessingException e) {
+                            log.warn("Failed to deserialize cached message for roomId={}", roomId);
+                            return null;
+                        }
+                    })
+                    .filter(r -> r != null)
+                    .limit(limit)
+                    .toList();
+
+                if (!cachedResponses.isEmpty()) {
+                    long totalCount = messageRepository.countByRoomId(roomId);
+                    int totalPages = (int) Math.ceil((double) totalCount / limit);
+                    return new PageResponse<>(
+                        cachedResponses,
+                        new PageResponse.PageMeta(totalCount, page, limit, totalPages)
+                    );
+                }
+            }
+        }
+
         Page<Message> messagePage = messageRepository.findByRoomIdOrderByCreatedAtDesc(
             roomId, PageRequest.of(page - 1, limit)
         );
 
+        // Batch load users to avoid N+1
+        Set<String> userIds = messagePage.getContent().stream()
+            .map(Message::getUserId).collect(Collectors.toSet());
+        Map<String, User> usersById = userRepository.findAllById(userIds).stream()
+            .collect(Collectors.toMap(User::getId, u -> u));
+
         List<MessageResponse> messageResponses = messagePage.getContent().stream()
-            .map(m -> {
-                User user = userRepository.findById(m.getUserId()).orElse(null);
-                return MessageResponse.from(m, user);
-            })
+            .map(m -> MessageResponse.from(m, usersById.get(m.getUserId())))
             .toList();
 
         return new PageResponse<>(
@@ -185,11 +247,13 @@ public class ChatService {
     private ChatRoomResponse buildChatRoomResponse(String roomId) {
         ChatRoom room = chatRoomRepository.findById(roomId).orElseThrow();
         List<ChatRoomMember> members = chatRoomMemberRepository.findByRoomId(roomId);
+        // Batch load users to avoid N+1
+        Set<String> userIds = members.stream()
+            .map(ChatRoomMember::getUserId).collect(Collectors.toSet());
+        Map<String, User> usersById = userRepository.findAllById(userIds).stream()
+            .collect(Collectors.toMap(User::getId, u -> u));
         List<MemberResponse> memberResponses = members.stream()
-            .map(m -> {
-                User user = userRepository.findById(m.getUserId()).orElse(null);
-                return MemberResponse.from(m, user);
-            })
+            .map(m -> MemberResponse.from(m, usersById.get(m.getUserId())))
             .toList();
 
         return ChatRoomResponse.builder()
