@@ -5,14 +5,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ReadReceiptEvent {
-    private String userId;
-    private List<String> messageIds;
+public class FileProcessEvent {
+    private String fileUrl;
     private String roomId;
+    private String messageId;
+    private String processType;
 }

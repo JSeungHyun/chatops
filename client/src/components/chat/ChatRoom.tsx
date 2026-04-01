@@ -31,6 +31,7 @@ export function ChatRoom() {
   const typingUsers = useChatStore((s) => s.typingUsers);
   const setTypingUser = useChatStore((s) => s.setTypingUser);
   const clearTypingUsers = useChatStore((s) => s.clearTypingUsers);
+  const readReceipts = useChatStore((s) => s.readReceipts);
   const user = useAuthStore((s) => s.user);
 
   const { messages, isLoading, hasMore, loadMore } = useMessages(
@@ -67,10 +68,13 @@ export function ChatRoom() {
     onTyping: handleTyping,
   });
 
-  // Clear typing users when changing rooms
+  const clearReadReceipts = useChatStore((s) => s.clearReadReceipts);
+
+  // Clear typing users and read receipts when changing rooms
   useEffect(() => {
     clearTypingUsers();
-  }, [currentRoom?.id, clearTypingUsers]);
+    clearReadReceipts();
+  }, [currentRoom?.id, clearTypingUsers, clearReadReceipts]);
 
   // Notify server when leaving a room (unmount or room change)
   useEffect(() => {
@@ -250,6 +254,8 @@ export function ChatRoom() {
                   isOwn={isOwn}
                   showAvatar={showAvatar}
                   showTimestamp={showTimestamp}
+                  readByCount={readReceipts[msg.id]?.length ?? 0}
+                  roomType={currentRoom.type}
                 />
               </div>
             </div>

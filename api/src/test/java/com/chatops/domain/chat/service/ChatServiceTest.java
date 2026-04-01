@@ -15,6 +15,8 @@ import com.chatops.domain.message.repository.MessageRepository;
 import com.chatops.domain.user.entity.User;
 import com.chatops.domain.user.repository.UserRepository;
 import com.chatops.global.common.dto.PageResponse;
+import com.chatops.global.queue.producer.NotificationProducer;
+import com.chatops.global.queue.producer.ReadReceiptProducer;
 import com.chatops.global.redis.RedisService;
 import com.chatops.support.TestFixture;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,6 +64,12 @@ class ChatServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private NotificationProducer notificationProducer;
+
+    @Mock
+    private ReadReceiptProducer readReceiptProducer;
 
     @Test
     @DisplayName("createRoom - 1대1 성공")

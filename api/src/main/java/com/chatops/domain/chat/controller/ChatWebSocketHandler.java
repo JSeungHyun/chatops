@@ -91,6 +91,19 @@ public class ChatWebSocketHandler {
         log.debug("Typing event broadcast to /topic/room/{}/typing: userId={}, isTyping={}", roomId, userId, typingEvent.isTyping());
     }
 
+    @MessageMapping("/chat/{roomId}/read")
+    public void handleReadReceipt(
+        @DestinationVariable String roomId,
+        SimpMessageHeaderAccessor headerAccessor
+    ) {
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
+        String userId = sessionAttributes != null ? (String) sessionAttributes.get("userId") : null;
+        if (userId != null) {
+            chatService.markRoomAsRead(userId, roomId);
+            log.debug("Read receipt processed: userId={}, roomId={}", userId, roomId);
+        }
+    }
+
     @MessageMapping("/chat/{roomId}/leave")
     public void handleLeaveRoom(
         @DestinationVariable String roomId,

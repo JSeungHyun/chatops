@@ -23,7 +23,7 @@ public class RedisMessageRelay implements MessageListener {
     private final String serverId = UUID.randomUUID().toString();
 
     private static final Pattern SAFE_DESTINATION = Pattern.compile(
-        "^/topic/(room/[a-f0-9\\-]+(/typing)?|presence)$");
+        "^/topic/(room/[a-f0-9\\-]+(/typing|/read-receipts)?|presence)$");
 
     private static final String USER_MESSAGES_CHANNEL = "user-messages";
 

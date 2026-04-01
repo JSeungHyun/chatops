@@ -7,6 +7,7 @@ import { NewChatModal } from '@/components/chat/NewChatModal';
 import { useChatStore, getLastRoomId, clearLastRoomId } from '@/stores/chatStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useUiStore } from '@/stores/uiStore';
+import { requestNotificationPermission } from '@/utils/notification';
 
 export function ChatPage() {
   const [showNewChat, setShowNewChat] = useState(false);
@@ -18,6 +19,25 @@ export function ChatPage() {
   const user = useAuthStore((s) => s.user);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const hasRestoredRef = useRef(false);
+
+  // Request browser notification permission on mount
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
+  // Navigate to room when browser notification is clicked
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const roomId = (e as CustomEvent<{ roomId: string }>).detail.roomId;
+      const room = useChatStore.getState().rooms.find((r) => r.id === roomId);
+      if (room) {
+        setCurrentRoom(room);
+        navigate(`/chat/${roomId}`, { replace: true });
+      }
+    };
+    window.addEventListener('navigate-to-room', handler);
+    return () => window.removeEventListener('navigate-to-room', handler);
+  }, [navigate, setCurrentRoom]);
 
   // Restore last room after rooms are loaded
   useEffect(() => {

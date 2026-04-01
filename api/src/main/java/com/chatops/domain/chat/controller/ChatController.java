@@ -73,6 +73,13 @@ public class ChatController {
         return response;
     }
 
+    @PostMapping("/{id}/read")
+    public void markAsRead(
+            @AuthenticationPrincipal User user,
+            @PathVariable String id) {
+        chatService.markRoomAsRead(user.getId(), id);
+    }
+
     @GetMapping("/{id}/messages")
     public PageResponse<MessageResponse> getMessages(
             @AuthenticationPrincipal User user,

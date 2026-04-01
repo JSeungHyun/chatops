@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ChatRoom, Message } from '../types/chat';
+import type { ReadReceiptUpdate } from '../types/message';
 
 const LAST_ROOM_KEY_PREFIX = 'chatops_last_room:';
 
@@ -37,6 +38,7 @@ interface ChatState {
   isLoadingMessages: boolean;
   typingUsers: Record<string, string>; // userId -> nickname
   onlineUsers: Record<string, boolean>; // userId -> online
+  readReceipts: Record<string, string[]>; // messageId -> readBy userIds
   setRooms: (rooms: ChatRoom[]) => void;
   setCurrentRoom: (room: ChatRoom | null) => void;
   setMessages: (messages: Message[]) => void;
@@ -52,6 +54,8 @@ interface ChatState {
   setOnlineUser: (userId: string, online: boolean) => void;
   setOnlineUsers: (statuses: Record<string, boolean>) => void;
   updateRoomWithNewMessage: (roomId: string, message: Message) => void;
+  updateReadReceipts: (update: ReadReceiptUpdate) => void;
+  clearReadReceipts: () => void;
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -64,6 +68,7 @@ export const useChatStore = create<ChatState>((set) => ({
   isLoadingMessages: false,
   typingUsers: {},
   onlineUsers: {},
+  readReceipts: {},
   setRooms: (rooms) => set({ rooms }),
   setCurrentRoom: (room) =>
     set((state) => ({
@@ -103,6 +108,18 @@ export const useChatStore = create<ChatState>((set) => ({
     set((state) => ({
       onlineUsers: { ...state.onlineUsers, ...statuses },
     })),
+  updateReadReceipts: (update) =>
+    set((state) => {
+      const next = { ...state.readReceipts };
+      for (const msgId of update.messageIds) {
+        const existing = next[msgId] ?? [];
+        if (!existing.includes(update.userId)) {
+          next[msgId] = [...existing, update.userId];
+        }
+      }
+      return { readReceipts: next };
+    }),
+  clearReadReceipts: () => set({ readReceipts: {} }),
   updateRoomWithNewMessage: (roomId, message) =>
     set((state) => {
       const isCurrentRoom = state.currentRoom?.id === roomId;

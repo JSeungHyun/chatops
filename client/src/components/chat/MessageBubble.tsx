@@ -4,12 +4,15 @@ import { FileText, Download } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
 import { formatDate } from '@/utils/format';
 import type { Message } from '@/types/message';
+import type { RoomType } from '@/types/chat';
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean;
   showAvatar: boolean;
   showTimestamp: boolean;
+  readByCount?: number;
+  roomType?: RoomType;
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -17,6 +20,8 @@ export const MessageBubble = memo(function MessageBubble({
   isOwn,
   showAvatar,
   showTimestamp,
+  readByCount = 0,
+  roomType = 'DIRECT',
 }: MessageBubbleProps) {
   return (
     <div
@@ -89,11 +94,18 @@ export const MessageBubble = memo(function MessageBubble({
           )}
         </div>
 
-        {/* Timestamp */}
+        {/* Timestamp + Read receipt */}
         {showTimestamp && (
-          <span className="mt-0.5 text-[11px] text-slate-400">
-            {formatDate(message.createdAt)}
-          </span>
+          <div className={clsx('mt-0.5 flex items-center gap-1.5', isOwn ? 'flex-row-reverse' : 'flex-row')}>
+            <span className="text-[11px] text-slate-400">
+              {formatDate(message.createdAt)}
+            </span>
+            {isOwn && readByCount > 0 && (
+              <span className="text-[11px] font-medium text-primary-500">
+                {roomType === 'DIRECT' ? '읽음' : `${readByCount}명 읽음`}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

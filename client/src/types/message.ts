@@ -12,3 +12,9 @@ export interface Message {
   createdAt: string;
   user: Pick<User, 'id' | 'email' | 'nickname' | 'avatar'>;
 }
+
+export interface ReadReceiptUpdate {
+  roomId: string;
+  userId: string;
+  messageIds: string[];
+}

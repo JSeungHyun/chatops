@@ -10,6 +10,7 @@ import {
 } from '../socket/socket';
 import { useAuthStore } from '../stores/authStore';
 import { useChatStore } from '../stores/chatStore';
+import { showNotification } from '../utils/notification';
 
 interface UseSocketOptions {
   roomId?: string;
@@ -29,6 +30,7 @@ export function useSocket({
   const token = useAuthStore((s) => s.token);
   const subscriptionRef = useRef<StompSubscription | null>(null);
   const typingSubRef = useRef<StompSubscription | null>(null);
+  const readReceiptSubRef = useRef<StompSubscription | null>(null);
   const errorSubRef = useRef<StompSubscription | null>(null);
   const presenceSubRef = useRef<StompSubscription | null>(null);
   const userMsgSubRef = useRef<StompSubscription | null>(null);
@@ -53,12 +55,13 @@ export function useSocket({
     if (!rid) return;
     subscriptionRef.current?.unsubscribe();
     typingSubRef.current?.unsubscribe();
+    readReceiptSubRef.current?.unsubscribe();
     if (onMessageRef.current) {
       subscriptionRef.current = subscribeToRoom(rid, onMessageRef.current);
     }
-    if (onTypingRef.current) {
-      const client = getStompClient();
-      if (client.connected) {
+    const client = getStompClient();
+    if (client.connected) {
+      if (onTypingRef.current) {
         const handler = onTypingRef.current;
         typingSubRef.current = client.subscribe(
           `/topic/room/${rid}/typing`,
@@ -72,6 +75,22 @@ export function useSocket({
           },
         );
       }
+
+      // Subscribe to read receipt updates
+      readReceiptSubRef.current = client.subscribe(
+        `/topic/room/${rid}/read-receipts`,
+        (frame) => {
+          try {
+            const data = JSON.parse(frame.body) as { userId: string; roomId: string; messageIds: string[] };
+            useChatStore.getState().updateReadReceipts(data);
+          } catch {
+            // ignore malformed frames
+          }
+        },
+      );
+
+      // Notify server that we're reading this room
+      client.publish({ destination: `/app/chat/${rid}/read`, body: '{}' });
     }
   }, []);
 
@@ -105,11 +124,16 @@ export function useSocket({
       // Subscribe to personal message queue for cross-room notifications
       userMsgSubRef.current = stompSubscribe('/user/queue/messages', (frame) => {
         try {
-          const msg = JSON.parse(frame.body) as { roomId: string; userId: string; content: string; createdAt: string; id: string; user: unknown };
+          const msg = JSON.parse(frame.body) as { roomId: string; userId: string; content: string; createdAt: string; id: string; user: { nickname: string } };
           const store = useChatStore.getState();
           // Only update room list — current room messages are handled by room subscription
           if (msg.roomId !== store.currentRoom?.id) {
             store.updateRoomWithNewMessage(msg.roomId, msg as never);
+            showNotification(msg.user.nickname, {
+              body: msg.content,
+              tag: `msg-${msg.roomId}`,
+              roomId: msg.roomId,
+            });
           }
         } catch {
           // ignore malformed frames
@@ -148,6 +172,8 @@ export function useSocket({
       subscriptionRef.current = null;
       typingSubRef.current?.unsubscribe();
       typingSubRef.current = null;
+      readReceiptSubRef.current?.unsubscribe();
+      readReceiptSubRef.current = null;
       errorSubRef.current?.unsubscribe();
       errorSubRef.current = null;
       presenceSubRef.current?.unsubscribe();
@@ -176,6 +202,8 @@ export function useSocket({
     subscriptionRef.current = null;
     typingSubRef.current?.unsubscribe();
     typingSubRef.current = null;
+    readReceiptSubRef.current?.unsubscribe();
+    readReceiptSubRef.current = null;
     errorSubRef.current?.unsubscribe();
     errorSubRef.current = null;
     presenceSubRef.current?.unsubscribe();

@@ -7,6 +7,10 @@ import com.chatops.domain.chat.dto.CreateRoomRequest;
 import com.chatops.domain.chat.dto.SendMessageRequest;
 import com.chatops.domain.chat.dto.SendMessageResult;
 import com.chatops.global.common.dto.PageResponse;
+import com.chatops.global.queue.dto.NotificationEvent;
+import com.chatops.global.queue.dto.ReadReceiptEvent;
+import com.chatops.global.queue.producer.NotificationProducer;
+import com.chatops.global.queue.producer.ReadReceiptProducer;
 import com.chatops.global.redis.RedisService;
 import com.chatops.domain.message.entity.Message;
 import com.chatops.domain.message.repository.MessageRepository;
@@ -45,6 +49,8 @@ public class ChatService {
     private final UserRepository userRepository;
     private final RedisService redisService;
     private final ObjectMapper objectMapper;
+    private final NotificationProducer notificationProducer;
+    private final ReadReceiptProducer readReceiptProducer;
 
     @Transactional
     public ChatRoomResponse createRoom(String userId, CreateRoomRequest request) {
@@ -181,6 +187,17 @@ public class ChatService {
                 notifyUserIds.add(member.getUserId());
                 if (!viewers.contains(member.getUserId())) {
                     redisService.incrementUnread(member.getUserId(), roomId);
+
+                    // Publish notification for offline members
+                    if (!redisService.isOnline(member.getUserId())) {
+                        notificationProducer.sendNotification(NotificationEvent.builder()
+                            .userId(member.getUserId())
+                            .roomId(roomId)
+                            .messageId(saved.getId())
+                            .senderNickname(sender.getNickname())
+                            .content(request.getContent())
+                            .build());
+                    }
                 }
             }
         }
@@ -258,6 +275,35 @@ public class ChatService {
                 messagePage.getTotalPages()
             )
         );
+    }
+
+    public void markRoomAsRead(String userId, String roomId) {
+        chatRoomRepository.findById(roomId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat room not found"));
+
+        if (!chatRoomMemberRepository.existsByUserIdAndRoomId(userId, roomId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this chat room");
+        }
+
+        redisService.addViewer(roomId, userId);
+        redisService.resetUnread(userId, roomId);
+
+        // Get recent messages (excluding own) for read receipt
+        Page<Message> recentMessages = messageRepository.findByRoomIdOrderByCreatedAtDesc(
+            roomId, PageRequest.of(0, 50));
+
+        List<String> messageIds = recentMessages.getContent().stream()
+            .filter(m -> !m.getUserId().equals(userId))
+            .map(Message::getId)
+            .toList();
+
+        if (!messageIds.isEmpty()) {
+            readReceiptProducer.sendReadReceipt(ReadReceiptEvent.builder()
+                .userId(userId)
+                .roomId(roomId)
+                .messageIds(messageIds)
+                .build());
+        }
     }
 
     private ChatRoomResponse buildChatRoomResponse(String roomId) {
